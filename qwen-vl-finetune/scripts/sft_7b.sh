@@ -3,7 +3,7 @@
 # Distributed training configuration
 MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
 MASTER_PORT=${MASTER_PORT:-$(shuf -i 20001-29999 -n 1)}
-NNODES=${WORLD_SIZE:-1}
+NNODES=$(nvidia-smi --list-gpus | wc -l)
 
 # DeepSpeed configuration
 deepspeed=./scripts/zero3.json
@@ -13,14 +13,14 @@ llm=Qwen/Qwen2.5-VL-7B-Instruct  # Using HuggingFace model ID
 
 # Training hyperparameters
 lr=2e-7
-batch_size=4
-grad_accum_steps=4
+batch_size=1
+grad_accum_steps=2
 
 # Training entry point
 entry_file=qwenvl/train/train_qwen.py
 
 # Dataset configuration (replace with public dataset names)
-datasets=public_dataset1,public_dataset2
+datasets=my_dataset
 
 # Output configuration
 run_name="qwen2vl-baseline"
@@ -60,7 +60,7 @@ args="
     --report_to wandb"
 
 # Launch training
-torchrun --nproc_per_node=${NPROC_PER_NODE} \
+torchrun --nproc_per_node=${NNODES} \
          --master_addr=${MASTER_ADDR} \
          --master_port=${MASTER_PORT} \
          ${entry_file} ${args}
