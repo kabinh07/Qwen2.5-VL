@@ -57,7 +57,7 @@ args="
     --gradient_checkpointing True \
     --dataloader_num_workers 4 \
     --run_name ${run_name} \
-    --report_to wandb"
+    --report_to tensorboard"
 
 # Launch training
 torchrun --nproc_per_node=${NNODES} \

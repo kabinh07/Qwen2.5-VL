@@ -9,3 +9,4 @@ wheels/
 # venv
 .venv
 qwen-vl-finetune/data/*
+.cache

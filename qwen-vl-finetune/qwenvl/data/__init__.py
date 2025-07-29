@@ -27,8 +27,8 @@ VIDEOCHATGPT = {
 }
 
 MY_DATASET = {
-    "annotation_path": "/workspace/data/annotations.json",
-    "data_path": "/workspace/data/images",
+    "annotation_path": "/data/shared/Qwen/qwen-vl-finetune/data/annotations.json",
+    "data_path": "/data/shared/Qwen/qwen-vl-finetune/data/images",
 }
 
 data_dict = {
