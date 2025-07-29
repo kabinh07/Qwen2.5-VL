@@ -43,7 +43,7 @@ from qwenvl.train.argument import (
     TrainingArguments,
     LoraArguments
 )
-# from peft import get_peft_model
+from peft import get_peft_model, LoraConfig
 from transformers import AutoTokenizer, AutoProcessor, Qwen2VLImageProcessor, Trainer, GPTQConfig
 
 local_rank = None
@@ -101,7 +101,17 @@ def train(attn_implementation="flash_attention_2"):
         (ModelArguments, DataArguments, TrainingArguments, LoraArguments)
     )
     model_args, data_args, training_args, lora_args = parser.parse_args_into_dataclasses()
-
+    lora_config = LoraConfig(
+        r=64,
+        lora_alpha=16,
+        target_modules=[
+            "q_proj", "k_proj", "v_proj", "o_proj",
+            "gate_proj", "up_proj", "down_proj",
+            ],
+        lora_dropout=0.05,
+        bias="none",
+        task_type="CAUSAL_LM"
+    )
     local_rank = training_args.local_rank
     os.makedirs(training_args.output_dir, exist_ok=True)
 
@@ -114,7 +124,7 @@ def train(attn_implementation="flash_attention_2"):
             load_in_4bit=True
         )
         # Adding peft
-        # model = get_peft_model(model, lora_args)
+        model = get_peft_model(model, lora_config)
         data_args.image_processor = AutoProcessor.from_pretrained(
             model_args.model_name_or_path,
         ).image_processor
