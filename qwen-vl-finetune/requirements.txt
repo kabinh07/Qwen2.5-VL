@@ -5,3 +5,6 @@ accelerate==1.4.0
 torchcodec==0.2
 datasets
 decord
+tensorboardX
+optimum
+bitsandbytes

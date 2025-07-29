@@ -2,7 +2,19 @@ import transformers
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Sequence, List
 
-
+@dataclass
+class LoraArguments:
+    r: int = 64
+    lora_alpha: int = 16
+    lora_target_modules: List[str] = field(
+        default_factory=lambda: [
+        "q_proj", "k_proj", "v_proj", "o_proj",
+        "gate_proj", "up_proj", "down_proj",
+        ]
+    )
+    lora_weight_path: str = "./outputs/lora_weights"
+    bias: str = "none"
+    
 @dataclass
 class ModelArguments:
     model_name_or_path: Optional[str] = field(default="Qwen/Qwen2.5-VL-3B-Instruct")

@@ -41,8 +41,10 @@ from qwenvl.train.argument import (
     ModelArguments,
     DataArguments,
     TrainingArguments,
+    LoraArguments
 )
-from transformers import AutoTokenizer, AutoProcessor, Qwen2VLImageProcessor, Trainer
+# from peft import get_peft_model
+from transformers import AutoTokenizer, AutoProcessor, Qwen2VLImageProcessor, Trainer, GPTQConfig
 
 local_rank = None
 
@@ -96,9 +98,9 @@ def train(attn_implementation="flash_attention_2"):
     global local_rank
 
     parser = transformers.HfArgumentParser(
-        (ModelArguments, DataArguments, TrainingArguments)
+        (ModelArguments, DataArguments, TrainingArguments, LoraArguments)
     )
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    model_args, data_args, training_args, lora_args = parser.parse_args_into_dataclasses()
 
     local_rank = training_args.local_rank
     os.makedirs(training_args.output_dir, exist_ok=True)
@@ -109,7 +111,10 @@ def train(attn_implementation="flash_attention_2"):
             cache_dir=training_args.cache_dir,
             attn_implementation=attn_implementation,
             torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
+            load_in_4bit=True
         )
+        # Adding peft
+        # model = get_peft_model(model, lora_args)
         data_args.image_processor = AutoProcessor.from_pretrained(
             model_args.model_name_or_path,
         ).image_processor
