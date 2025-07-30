@@ -119,15 +119,20 @@ def _flash_attention_forward(
     return attn_output
 
 
+# def _update_causal_mask(
+#     self,
+#     attention_mask: torch.Tensor,
+#     input_tensor: torch.Tensor,
+#     cache_position: torch.Tensor,
+#     past_key_values: Cache,
+#     output_attentions: bool,
+# ):
+#     return attention_mask
+
 def _update_causal_mask(
-    self,
-    attention_mask: torch.Tensor,
-    input_tensor: torch.Tensor,
-    cache_position: torch.Tensor,
-    past_key_values: Cache,
-    output_attentions: bool,
+    self, attention_mask, input_tensor, cache_position, past_key_values, output_attentions
 ):
-    return attention_mask
+    return None
 
 
 def replace_qwen2_vl_attention_class():

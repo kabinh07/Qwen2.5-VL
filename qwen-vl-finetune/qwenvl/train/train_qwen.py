@@ -196,4 +196,7 @@ def train(attn_implementation="flash_attention_2"):
 
 
 if __name__ == "__main__":
+    torch.backends.cuda.enable_flash_sdp(False)
+    torch.backends.cuda.enable_mem_efficient_sdp(False)
+    torch.backends.cuda.enable_math_sdp(True)
     train(attn_implementation="eager")
