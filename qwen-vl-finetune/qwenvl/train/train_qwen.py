@@ -43,8 +43,8 @@ from qwenvl.train.argument import (
     TrainingArguments,
     LoraArguments
 )
-from peft import get_peft_model, LoraConfig
-from transformers import AutoTokenizer, AutoProcessor, Qwen2VLImageProcessor, Trainer, GPTQConfig
+from peft import get_peft_model, LoraConfig, prepare_model_for_kbit_training
+from transformers import AutoTokenizer, AutoProcessor, Qwen2VLImageProcessor, Trainer, BitsAndBytesConfig
 
 local_rank = None
 
@@ -120,10 +120,16 @@ def train(attn_implementation="flash_attention_2"):
             model_args.model_name_or_path,
             cache_dir=training_args.cache_dir,
             attn_implementation=attn_implementation,
-            torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-            load_in_4bit=True
+            torch_dtype=(torch.bfloat16 if training_args.bf16 else torch.float32),
+            quantization_config=BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.float32
+            )
         )
         # Adding peft
+        model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
         model = get_peft_model(model, lora_config)
         data_args.image_processor = AutoProcessor.from_pretrained(
             model_args.model_name_or_path,
@@ -162,11 +168,11 @@ def train(attn_implementation="flash_attention_2"):
         padding_side="right",
         use_fast=False,
     )
-    set_model(model_args, model)
+    # set_model(model_args, model)
 
     if torch.distributed.get_rank() == 0:
-        model.visual.print_trainable_parameters()
-        model.model.print_trainable_parameters()
+        model.base_model.model.visual.print_trainable_parameters()
+        model.base_model.model.model.print_trainable_parameters()
     
     if data_args.data_packing:
         data_module = make_supervised_data_module_packed(tokenizer=tokenizer, data_args=data_args)
@@ -190,4 +196,4 @@ def train(attn_implementation="flash_attention_2"):
 
 
 if __name__ == "__main__":
-    train(attn_implementation="flash_attention_2")
+    train(attn_implementation="eager")
