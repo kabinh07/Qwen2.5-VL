@@ -10,3 +10,4 @@ wheels/
 .venv
 qwen-vl-finetune/data/*
 .cache
+qwen-vl-finetune/output/*
