@@ -136,6 +136,7 @@ def _update_causal_mask(
 
 
 def replace_qwen2_vl_attention_class():
+    
     import transformers
     import transformers.modeling_flash_attention_utils
 

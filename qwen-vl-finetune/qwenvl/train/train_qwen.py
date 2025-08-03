@@ -101,16 +101,14 @@ def train(attn_implementation="flash_attention_2"):
         (ModelArguments, DataArguments, TrainingArguments, LoraArguments)
     )
     model_args, data_args, training_args, lora_args = parser.parse_args_into_dataclasses()
+    print(f"\nLora ARGS: {lora_args}\n")
     lora_config = LoraConfig(
-        r=64,
-        lora_alpha=16,
-        target_modules=[
-            "q_proj", "k_proj", "v_proj", "o_proj",
-            "gate_proj", "up_proj", "down_proj",
-            ],
-        lora_dropout=0.05,
-        bias="none",
-        task_type="CAUSAL_LM"
+        r=lora_args.r,
+        lora_alpha=lora_args.lora_alpha,
+        target_modules=lora_args.target_modules,
+        lora_dropout=lora_args.lora_dropout,
+        bias=lora_args.bias,
+        task_type=lora_args.task_type
     )
     local_rank = training_args.local_rank
     os.makedirs(training_args.output_dir, exist_ok=True)
@@ -120,15 +118,16 @@ def train(attn_implementation="flash_attention_2"):
             model_args.model_name_or_path,
             cache_dir=training_args.cache_dir,
             attn_implementation=attn_implementation,
-            torch_dtype=(torch.bfloat16 if training_args.bf16 else torch.float32),
+            torch_dtype=(torch.bfloat16 if training_args.bf16 else torch.float16),
             quantization_config=BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_use_double_quant=True,
                 bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=torch.float32
+                bnb_4bit_compute_dtype=torch.float16
             )
         )
         # Adding peft
+        print(f"\n\nModel:\n{model}\n\n")
         model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
         model = get_peft_model(model, lora_config)
         data_args.image_processor = AutoProcessor.from_pretrained(

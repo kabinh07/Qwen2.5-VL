@@ -4,7 +4,8 @@ docker run -itd --rm --name qwen_vl_2-5-finetune \
 -v ./data:/data/shared/Qwen/qwen-vl-finetune/data \
 -v ./qwenvl:/data/shared/Qwen/qwen-vl-finetune/qwenvl \
 -v ./scripts/:/data/shared/Qwen/qwen-vl-finetune/scripts \
+-v ./output/:/data/shared/Qwen/qwen-vl-finetune/output \
 -v ../.cache:/root/.cache \
---gpus '"device=1,2,3"' \
+--gpus '"device=0,1,2"' \
 --shm-size=2g \
 qwen-vl-finetune:latest bash

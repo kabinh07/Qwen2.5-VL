@@ -5,15 +5,12 @@ from peft import TaskType
 
 @dataclass
 class LoraArguments:
-    r: int = 64
-    lora_alpha: int = 16
+    r: int = 8
+    lora_alpha: int = 8
     target_modules: List[str] = field(
-        default_factory=lambda: [
-        "q_proj", "k_proj", "v_proj", "o_proj",
-        "gate_proj", "up_proj", "down_proj",
-        ]
+        default_factory=lambda: ["gate_proj", "up_proj", "down_proj"]
     )
-    lora_weight_path: str = "./outputs/lora_weights"
+    lora_dropout: float = 0.05
     bias: str = "none"
     task_type: TaskType = TaskType.CAUSAL_LM
     
