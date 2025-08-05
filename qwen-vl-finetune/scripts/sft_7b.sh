@@ -1,4 +1,5 @@
 #!/bin/bash
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # Distributed training configuration
 MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
@@ -6,7 +7,7 @@ MASTER_PORT=${MASTER_PORT:-$(shuf -i 20001-29999 -n 1)}
 NNODES=$(nvidia-smi --list-gpus | wc -l)
 
 # DeepSpeed configuration
-deepspeed=./scripts/zero3.json
+deepspeed=./scripts/zero2.json
 
 # Model configuration
 llm=Qwen/Qwen2.5-VL-7B-Instruct  # Using HuggingFace model ID
@@ -14,7 +15,7 @@ llm=Qwen/Qwen2.5-VL-7B-Instruct  # Using HuggingFace model ID
 # Training hyperparameters
 lr=2e-7
 batch_size=1
-grad_accum_steps=2
+grad_accum_steps=8
 
 # Training entry point
 entry_file=qwenvl/train/train_qwen.py
@@ -27,24 +28,28 @@ run_name="qwen2vl-baseline"
 output_dir=./output
 
 # Training arguments
+    # --save_strategy "steps" \
+    # --save_steps 10 \
+    # --save_total_limit 1 \
 args="
     --deepspeed ${deepspeed} \
     --model_name_or_path "${llm}" \
     --dataset_use ${datasets} \
-    --data_flatten True \
-    --tune_mm_vision False \
+    --data_flatten False \
+    --tune_mm_vision True \
     --tune_mm_mlp True \
     --tune_mm_llm True \
     --output_dir ${output_dir} \
     --num_train_epochs 0.5 \
     --per_device_train_batch_size ${batch_size} \
-    --per_device_eval_batch_size $((batch_size*2)) \
+    --per_device_eval_batch_size ${batch_size} \
     --gradient_accumulation_steps ${grad_accum_steps} \
     --max_pixels 50176 \
     --min_pixels 784 \
-    --eval_strategy "no" \
+    --eval_strategy "steps" \
+    --eval_steps 200 \
     --save_strategy "steps" \
-    --save_steps 1000 \
+    --save_steps 10 \
     --save_total_limit 1 \
     --learning_rate ${lr} \
     --weight_decay 0 \

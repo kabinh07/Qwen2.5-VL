@@ -41,10 +41,8 @@ from qwenvl.train.argument import (
     ModelArguments,
     DataArguments,
     TrainingArguments,
-    LoraArguments
 )
-from peft import get_peft_model, LoraConfig, prepare_model_for_kbit_training
-from transformers import AutoTokenizer, AutoProcessor, Qwen2VLImageProcessor, Trainer, BitsAndBytesConfig
+from transformers import AutoTokenizer, AutoProcessor, Qwen2VLImageProcessor, Trainer
 
 local_rank = None
 
@@ -70,62 +68,37 @@ def safe_save_model_for_hf_trainer(trainer: transformers.Trainer, output_dir: st
 
 
 def set_model(model_args, model):
-    # Handle both PEFT and non-PEFT models
-    if hasattr(model, 'base_model'):
-        # PEFT model (QLoRA)
-        base_model = model.base_model.model
-    else:
-        # Regular model
-        base_model = model
-    
     if model_args.tune_mm_vision:
-        for n, p in base_model.visual.named_parameters():
+        for n, p in model.visual.named_parameters():
             p.requires_grad = True
     else:
-        for n, p in base_model.visual.named_parameters():
+        for n, p in model.visual.named_parameters():
             p.requires_grad = False
 
     if model_args.tune_mm_mlp:
-        for n, p in base_model.visual.merger.named_parameters():
+        for n, p in model.visual.merger.named_parameters():
             p.requires_grad = True
     else:
-        for n, p in base_model.visual.merger.named_parameters():
+        for n, p in model.visual.merger.named_parameters():
             p.requires_grad = False
 
     if model_args.tune_mm_llm:
-        for n, p in base_model.model.named_parameters():
+        for n, p in model.model.named_parameters():
             p.requires_grad = True
-        base_model.lm_head.requires_grad = True
+        model.lm_head.requires_grad = True
     else:
-        for n, p in base_model.model.named_parameters():
+        for n, p in model.model.named_parameters():
             p.requires_grad = False
-        base_model.lm_head.requires_grad = False
+        model.lm_head.requires_grad = False
 
 
 def train(attn_implementation="flash_attention_2"):
     global local_rank
 
     parser = transformers.HfArgumentParser(
-        (ModelArguments, DataArguments, TrainingArguments, LoraArguments)
+        (ModelArguments, DataArguments, TrainingArguments)
     )
-    model_args, data_args, training_args, lora_args = parser.parse_args_into_dataclasses()
-    print(f"\nLora ARGS: {lora_args}\n")
-    lora_config = LoraConfig(
-        r=lora_args.r,
-        lora_alpha=lora_args.lora_alpha,
-        target_modules=lora_args.target_modules,
-        lora_dropout=lora_args.lora_dropout,
-        bias=lora_args.bias,
-        task_type=lora_args.task_type
-    )
-
-    if data_args.data_packing:
-        assert data_args.data_flatten, "data_packing requires data_flatten to be enabled."
-
-    if data_args.data_flatten or data_args.data_packing:
-        assert attn_implementation == "flash_attention_2", \
-            "data_flatten and data_packing only support 'flash_attention_2' implementation. " \
-            f"Current implementation: '{attn_implementation}'."
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     local_rank = training_args.local_rank
     os.makedirs(training_args.output_dir, exist_ok=True)
@@ -135,18 +108,8 @@ def train(attn_implementation="flash_attention_2"):
             model_args.model_name_or_path,
             cache_dir=training_args.cache_dir,
             attn_implementation=attn_implementation,
-            torch_dtype=(torch.bfloat16 if training_args.bf16 else torch.float16),
-            quantization_config=BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_use_double_quant=True,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=torch.float16
-            )
+            torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
         )
-        # Adding peft
-        print(f"\n\nModel:\n{model}\n\n")
-        model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
-        model = get_peft_model(model, lora_config)
         data_args.image_processor = AutoProcessor.from_pretrained(
             model_args.model_name_or_path,
         ).image_processor
@@ -184,49 +147,15 @@ def train(attn_implementation="flash_attention_2"):
         padding_side="right",
         use_fast=False,
     )
-    # Note: With QLoRA, PEFT automatically manages which parameters are trainable
-    # The set_model function is mainly for full fine-tuning scenarios
-    # For QLoRA, LoRA target_modules configuration controls what gets trained
-    if not hasattr(model, 'base_model'):
-        # Only apply set_model for non-PEFT models (full fine-tuning)
-        set_model(model_args, model)
+    set_model(model_args, model)
 
     if torch.distributed.get_rank() == 0:
-        model.base_model.model.visual.print_trainable_parameters()
-        model.base_model.model.model.print_trainable_parameters()
-        
-        # Print detailed trainable parameter info
-        print("\n=== DETAILED TRAINABLE PARAMETERS ===")
-        total_params = 0
-        trainable_params = 0
-        vision_trainable = 0
-        llm_trainable = 0
-        
-        for name, param in model.named_parameters():
-            total_params += param.numel()
-            if param.requires_grad:
-                trainable_params += param.numel()
-                if 'visual' in name or 'vision' in name:
-                    vision_trainable += param.numel()
-                    print(f"VISION TRAINABLE: {name} - {param.numel():,} params")
-                elif 'model.layers' in name or 'lm_head' in name:
-                    llm_trainable += param.numel()
-                    print(f"LLM TRAINABLE: {name} - {param.numel():,} params")
-                else:
-                    print(f"OTHER TRAINABLE: {name} - {param.numel():,} params")
-        
-        print(f"\n=== SUMMARY ===")
-        print(f"Total parameters: {total_params:,}")
-        print(f"Trainable parameters: {trainable_params:,} ({100*trainable_params/total_params:.2f}%)")
-        print(f"Vision trainable: {vision_trainable:,} ({100*vision_trainable/trainable_params:.2f}% of trainable)")
-        print(f"LLM trainable: {llm_trainable:,} ({100*llm_trainable/trainable_params:.2f}% of trainable)")
-        print("=" * 50)
+        model.visual.print_trainable_parameters()
+        model.model.print_trainable_parameters()
     
     if data_args.data_packing:
-        logging.info("Using data packing module")
         data_module = make_supervised_data_module_packed(tokenizer=tokenizer, data_args=data_args)
     else:
-        logging.info("Using make_supervised_data_module (not packed)")
         data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
     trainer = Trainer(
         model=model, processing_class=tokenizer, args=training_args, **data_module
@@ -246,4 +175,4 @@ def train(attn_implementation="flash_attention_2"):
 
 
 if __name__ == "__main__":
-    train(attn_implementation="eager")
+    train(attn_implementation="flash_attention_2")

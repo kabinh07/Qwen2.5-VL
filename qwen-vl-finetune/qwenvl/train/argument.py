@@ -8,7 +8,13 @@ class LoraArguments:
     r: int = 8
     lora_alpha: int = 8
     target_modules: List[str] = field(
-        default_factory=lambda: ["gate_proj", "up_proj", "down_proj"]
+        default_factory=lambda: [
+            # LLM modules
+            "gate_proj", "up_proj", "down_proj", 
+            "q_proj", "k_proj", "v_proj", "o_proj",
+            # Vision modules for better OCR performance
+            "qkv", "proj"
+        ]
     )
     lora_dropout: float = 0.05
     bias: str = "none"

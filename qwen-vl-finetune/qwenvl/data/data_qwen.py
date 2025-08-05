@@ -31,8 +31,9 @@ VIDEO_TOKEN_INDEX = 151656
 DEFAULT_IMAGE_TOKEN = "<image>"
 DEFAULT_VIDEO_TOKEN = "<video>"
 
-local_rank = None
+local_rank = int(os.environ.get("LOCAL_RANK", 0))
 
+test_subset_size = None
 
 def rank0_print(*args):
     if local_rank == 0:
@@ -193,6 +194,11 @@ class LazySupervisedDataset(Dataset):
         self.data_args.image_processor.min_pixels = data_args.min_pixels
         self.data_args.image_processor.size["longest_edge"] = data_args.max_pixels
         self.data_args.image_processor.size["shortest_edge"] = data_args.min_pixels
+
+        # Option to use only a small portion of the dataset for quick testing
+        if test_subset_size is not None and test_subset_size > 0:
+            list_data_dict = list_data_dict[:test_subset_size]
+            rank0_print(f"Using only {test_subset_size} samples for quick test training.")
 
     def __len__(self):
         return len(self.list_data_dict)
@@ -636,15 +642,28 @@ def make_supervised_data_module(
     tokenizer: transformers.PreTrainedTokenizer, data_args
 ) -> Dict:
     """Make dataset and collator for supervised fine-tuning."""
-    train_dataset = LazySupervisedDataset(tokenizer=tokenizer, data_args=data_args)
+    # Split dataset into 99.9% train, 0.1% validation
+    full_dataset = LazySupervisedDataset(tokenizer=tokenizer, data_args=data_args)
+    total_samples = len(full_dataset)
+    val_size = max(1, int(0.15 * total_samples))
+    train_size = total_samples - val_size
+    indices = list(range(total_samples))
+    random.shuffle(indices)
+    train_indices = indices[:train_size]
+    val_indices = indices[train_size:]
+
+    # Subset datasets
+    train_subset = torch.utils.data.Subset(full_dataset, train_indices)
+    val_subset = torch.utils.data.Subset(full_dataset, val_indices)
+
     if data_args.data_flatten:
         data_collator = FlattenedDataCollatorForSupervisedDataset(tokenizer=tokenizer)
         return dict(
-            train_dataset=train_dataset, eval_dataset=None, data_collator=data_collator
+            train_dataset=train_subset, eval_dataset=val_subset, data_collator=data_collator
         )
     data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
     return dict(
-        train_dataset=train_dataset, eval_dataset=None, data_collator=data_collator
+        train_dataset=train_subset, eval_dataset=val_subset, data_collator=data_collator
     )
 
 
