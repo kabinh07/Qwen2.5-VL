@@ -40,16 +40,16 @@ args="
     --tune_mm_mlp True \
     --tune_mm_llm True \
     --output_dir ${output_dir} \
-    --num_train_epochs 0.5 \
+    --num_train_epochs 5 \
     --per_device_train_batch_size ${batch_size} \
     --per_device_eval_batch_size ${batch_size} \
     --gradient_accumulation_steps ${grad_accum_steps} \
     --max_pixels 50176 \
     --min_pixels 784 \
     --eval_strategy "steps" \
-    --eval_steps 200 \
+    --eval_steps 500 \
     --save_strategy "steps" \
-    --save_steps 10 \
+    --save_steps 100 \
     --save_total_limit 1 \
     --learning_rate ${lr} \
     --weight_decay 0 \
@@ -61,10 +61,14 @@ args="
     --gradient_checkpointing True \
     --dataloader_num_workers 4 \
     --run_name ${run_name} \
-    --report_to tensorboard"
+    --report_to tensorboard \
+    --r 16 \
+    --lora_alpha 32 \
+    --lora_dropout 0.05"
 
 # Launch training
 torchrun --nproc_per_node=${NNODES} \
          --master_addr=${MASTER_ADDR} \
          --master_port=${MASTER_PORT} \
+         -- \
          ${entry_file} ${args}

@@ -196,7 +196,7 @@ def train(attn_implementation="flash_attention_2"):
         model.base_model.model.model.print_trainable_parameters()
         
         # Print detailed trainable parameter info
-        print("\n=== DETAILED TRAINABLE PARAMETERS ===")
+        # print("\n=== DETAILED TRAINABLE PARAMETERS ===")
         total_params = 0
         trainable_params = 0
         vision_trainable = 0
@@ -208,12 +208,12 @@ def train(attn_implementation="flash_attention_2"):
                 trainable_params += param.numel()
                 if 'visual' in name or 'vision' in name:
                     vision_trainable += param.numel()
-                    print(f"VISION TRAINABLE: {name} - {param.numel():,} params")
+                    # print(f"VISION TRAINABLE: {name} - {param.numel():,} params")
                 elif 'model.layers' in name or 'lm_head' in name:
                     llm_trainable += param.numel()
-                    print(f"LLM TRAINABLE: {name} - {param.numel():,} params")
-                else:
-                    print(f"OTHER TRAINABLE: {name} - {param.numel():,} params")
+                    # print(f"LLM TRAINABLE: {name} - {param.numel():,} params")
+                # else:
+                #     print(f"OTHER TRAINABLE: {name} - {param.numel():,} params")
         
         print(f"\n=== SUMMARY ===")
         print(f"Total parameters: {total_params:,}")
@@ -228,6 +228,17 @@ def train(attn_implementation="flash_attention_2"):
     else:
         logging.info("Using make_supervised_data_module (not packed)")
         data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
+
+    subset = data_module["train_dataset"]
+    underlying_dataset = subset.dataset
+    first_idx = subset.indices[0]
+    print("--- First Training Sample (RAW) ---")
+    if hasattr(underlying_dataset, "list_data_dict"):
+        print(underlying_dataset.list_data_dict[first_idx])
+    else:
+        print("Raw data attribute not found in underlying dataset.")
+    print("-----------------------------")
+
     trainer = Trainer(
         model=model, processing_class=tokenizer, args=training_args, **data_module
     )
